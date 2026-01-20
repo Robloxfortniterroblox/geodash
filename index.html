@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Geodash</title>
+    <style>
+        :root {
+            --bg-dark: #121212;
+            --bg-panel: #1e1e1e;
+            --accent: #00d2ff;
+            --accent-hover: #33e0ff;
+            --danger: #ff4444;
+            --success: #00cc66;
+            --warning: #ffcc00;
+            --text-main: #ffffff;
+            --text-dim: #aaaaaa;
+            --teigu-color: #00ff88;
+            --official-color: #55aaff;
+            --user-color: #888888;
+        }
+
+        body {
+            margin: 0;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            user-select: none;
+            overflow: hidden;
+            zoom: 1.25; /* Scaled up for standalone feel */
+        }
+
+        /* --- START SCREEN --- */
+        #start-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, #005c97 0%, #363795 100%);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 200;
+        }
+        #game-logo {
+            font-size: 80px; font-weight: 900; color: white;
+            text-shadow: 4px 4px 0 #000, 0 0 20px rgba(0,210,255,0.5);
+            margin-bottom: 40px; letter-spacing: 5px; font-style: italic;
+        }
+        #btn-start-game {
+            background: var(--success); color: black; border: 2px solid white;
+            padding: 15px 50px; font-size: 24px; font-weight: bold;
+            cursor: pointer; text-transform: uppercase;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5); transition: 0.2s;
+        }
+        #btn-start-game:hover { transform: scale(1.05); background: #33ff99; }
+
+        /* --- GAME UI WRAPPER --- */
+        #app-container { display: none; flex-direction: column; align-items: center; width: 100%; height: 100vh; overflow-y: auto; }
+
+        /* --- GAME AREA --- */
+        #game-wrapper {
+            position: relative;
+            margin-top: 20px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.6);
+            border: 4px solid #333;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+
+        canvas { display: block; background: linear-gradient(to bottom, #005c97, #363795); }
+
+        /* HUD ELEMENTS */
+        #fps-counter { position: absolute; top: 5px; left: 5px; color: lime; font-weight: bold; font-family: monospace; font-size: 12px; pointer-events: none; text-shadow: 1px 1px 0 #000; }
+        #attempt-counter { position: absolute; top: 10px; right: 15px; color: white; font-weight: bold; font-size: 16px; pointer-events: none; text-shadow: 1px 1px 0 #000; }
+        #testmode-label { display: none; position: absolute; top: 30px; right: 15px; color: var(--warning); font-weight: bold; font-size: 10px; pointer-events: none; text-shadow: 1px 1px 0 #000; letter-spacing: 1px; text-align: right; }
+        #percentage-label { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); color: white; font-weight: bold; font-size: 20px; pointer-events: none; text-shadow: 1px 1px 0 #000; }
+
+        #pause-overlay {
+            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); align-items: center; justify-content: center; flex-direction: column;
+            color: white; font-size: 30px; font-weight: bold; backdrop-filter: blur(2px); z-index: 20;
+        }
+
+        #end-screen-overlay {
+            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); align-items: center; justify-content: center; flex-direction: column;
+            z-index: 30;
+        }
+        .end-title { font-size: 40px; font-weight: 900; color: white; text-shadow: 2px 2px 0 #000; margin-bottom: 10px; }
+        .end-sub { font-size: 18px; color: var(--success); margin-bottom: 20px; }
+
+        #song-warning {
+            display: none; position: absolute; top: 40px; left: 50%; transform: translateX(-50%);
+            background: rgba(255, 68, 68, 0.9); color: white; padding: 8px 16px; border-radius: 4px;
+            font-size: 12px; font-weight: bold; z-index: 25; box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+
+        #btn-pause-float { position: absolute; top: 10px; right: 10px; display: none; }
+
+        /* --- CONTROL PANEL --- */
+        #main-ui {
+            width: 808px; margin-top: 15px; margin-bottom: 50px;
+            background-color: var(--bg-panel); border-radius: 8px;
+            overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            flex-shrink: 0;
+        }
+
+        .tabs { display: flex; background: #2a2a2a; border-bottom: 2px solid #333; }
+        .tab-btn {
+            flex: 1; padding: 12px; background: transparent; border: none;
+            color: var(--text-dim); font-weight: bold; text-transform: uppercase;
+            cursor: pointer; transition: 0.2s; border-bottom: 3px solid transparent;
+        }
+        .tab-btn:hover { background: #333; color: white; }
+        .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); background: #252525; }
+
+        .panel { display: none; padding: 20px; min-height: 140px; }
+        .panel.active { display: flex; flex-direction: column; gap: 15px; }
+
+        /* EDITOR SUB-TABS */
+        .sub-tabs { display: flex; gap: 5px; border-bottom: 1px solid #444; padding-bottom: 10px; margin-bottom: 10px; }
+        .sub-tab-btn {
+            background: transparent; border: none; color: #888; font-size: 11px; font-weight: bold; cursor: pointer; padding: 5px 10px; border-radius: 4px;
+        }
+        .sub-tab-btn.active { background: #333; color: white; }
+        .tool-group { display: none; gap: 10px; flex-wrap: wrap; }
+        .tool-group.active { display: flex; }
+
+        .controls-grid { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+        button.ui-btn {
+            background: #333; border: 1px solid #555; color: white;
+            padding: 8px 16px; border-radius: 4px; font-size: 12px;
+            font-weight: bold; text-transform: uppercase; cursor: pointer; transition: 0.2s;
+        }
+        button.ui-btn:hover { background: #444; border-color: #777; }
+        button.ui-btn.primary { background: var(--accent); color: #000; border-color: var(--accent); }
+        button.ui-btn.danger { border-color: var(--danger); color: var(--danger); }
+        button.ui-btn.danger:hover { background: var(--danger); color: white; }
+        button.ui-btn.tool-btn.active { background: var(--success); border-color: var(--success); color: black; }
+        #btn-end.active { background: var(--danger); color: white; border-color: var(--danger); }
+        #btn-delete { color: white; border-color: #ff4444; }
+        #btn-delete.active { background: #ff4444; color: white; box-shadow: 0 0 10px rgba(255, 68, 68, 0.4); }
+        button.ui-btn.filter-active { background: var(--success); border-color: var(--success); color: black; }
+
+        /* Icon Editor */
+        #icon-editor-container { display: flex; gap: 20px; align-items: flex-start; }
+        #editor-canvas {
+            border: 1px solid #555; cursor: crosshair;
+            background-image: linear-gradient(45deg, #222 25%, transparent 25%), linear-gradient(-45deg, #222 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #222 75%), linear-gradient(-45deg, transparent 75%, #222 75%);
+            background-size: 20px 20px;
+        }
+        .palette { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; }
+        .color-swatch { width: 30px; height: 30px; border: 2px solid #555; cursor: pointer; border-radius: 4px; }
+        .color-swatch.active { border-color: white; box-shadow: 0 0 5px white; }
+
+        /* Level List */
+        #level-display-area { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; max-height: 250px; overflow-y: auto; padding-right: 5px; }
+        .level-card { background: #252525; padding: 10px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333; }
+        .level-card.selected { border-color: var(--success); background: #1a2a1a; }
+        
+        /* Green border for completed levels */
+        .level-card.completed { border: 2px solid var(--success); box-shadow: 0 0 5px rgba(0,204,102,0.3); }
+
+        .level-credits { font-size: 0.8em; color: #888; display: block; margin-top: 2px; }
+        
+        .auth-teigu { color: var(--teigu-color); text-shadow: 0 0 5px rgba(0,255,136,0.3); font-weight: bold; }
+        .auth-official { color: var(--official-color); }
+        .auth-user { color: var(--user-color); }
+        .verified-badge { color: var(--teigu-color); margin-left: 4px; font-size: 1.1em; }
+
+        #status-badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; background: #333; color: #888; }
+        .st-green { background-color: var(--success) !important; color: black !important; }
+        .st-red { background-color: var(--danger) !important; color: white !important; }
+        
+        .shortcut-hint { font-size: 10px; color: #666; margin-left: 5px; }
+
+        /* MODAL (High Z-Index) */
+        #custom-modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); z-index: 1000;
+            justify-content: center; align-items: center;
+        }
+        .modal-content {
+            background: var(--bg-panel); border: 1px solid #555; padding: 20px;
+            border-radius: 8px; width: 400px; display: flex; flex-direction: column; gap: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8); pointer-events: auto;
+        }
+        .modal-title { font-weight: bold; font-size: 14px; color: var(--accent); text-transform: uppercase; }
+        .modal-input {
+            background: #111; border: 1px solid #444; color: white; padding: 8px;
+            font-family: monospace; font-size: 12px; resize: vertical; min-height: 40px;
+        }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <!-- START SCREEN -->
+    <div id="start-screen">
+        <div id="game-logo">GEODASH</div>
+        <button id="btn-start-game" onclick="startGame()">Play</button>
+    </div>
+
+    <!-- MAIN APP -->
+    <div id="app-container">
+        <!-- CUSTOM MODAL -->
+        <div id="custom-modal">
+            <div class="modal-content">
+                <div id="modal-title" class="modal-title">TITLE</div>
+                <p id="modal-desc" style="font-size:12px; color:#ccc; margin:0;"></p>
+                <textarea id="modal-input" class="modal-input"></textarea>
+                <div class="modal-actions">
+                    <button id="modal-copy-btn" class="ui-btn" style="display:none" onclick="copyModalText()">Copy</button>
+                    <button class="ui-btn" onclick="closeModal()">Cancel</button>
+                    <button id="modal-confirm-btn" class="ui-btn primary">Confirm</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- GAME WRAPPER -->
+        <div id="game-wrapper">
+            <div id="fps-counter">FPS: 60</div>
+            <div id="attempt-counter">Attempt 1</div>
+            <div id="testmode-label">TESTMODE</div>
+            <div id="percentage-label">0%</div>
+            <div id="song-warning">MISSING SONG FILE! ASK OR FIND IT</div>
+            
+            <canvas id="gameCanvas" width="800" height="450"></canvas>
+            
+            <div id="pause-overlay">
+                <div>PAUSED</div>
+                <button class="ui-btn primary" onclick="togglePause()" style="margin-top:20px; font-size:16px;">Resume</button>
+            </div>
+
+            <!-- END SCREEN OVERLAY -->
+            <div id="end-screen-overlay">
+                <div id="end-title-text" class="end-title">LEVEL COMPLETE!</div>
+                <div id="end-sub-text" class="end-sub"></div>
+                <div style="display:flex; gap:10px;">
+                    <button class="ui-btn primary" onclick="resetPlayer()">Replay</button>
+                    <button class="ui-btn" onclick="switchTab('levels')">Exit</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- UI PANEL -->
+        <div id="main-ui">
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('play')">Play</button>
+                <button class="tab-btn" onclick="switchTab('editor')">Editor</button>
+                <button class="tab-btn" onclick="switchTab('upload')">Upload</button>
+                <button class="tab-btn" onclick="switchTab('levels')">Levels</button>
+                <button class="tab-btn" onclick="switchTab('icon')">Icon Kit</button>
+                <button class="tab-btn" onclick="switchTab('settings')">Settings</button>
+            </div>
+
+            <!-- PLAY TAB -->
+            <div id="panel-play" class="panel active">
+                <div class="controls-grid">
+                    <button class="ui-btn primary" onclick="setMode('PLAY')">Start Level <span class="shortcut-hint">[ENTER]</span></button>
+                    <button class="ui-btn" onclick="die()">Respawn <span class="shortcut-hint">[R]</span></button>
+                    <div id="status-badge">UNVERIFIED</div>
+                </div>
+                <div style="font-size:12px; color:#888; margin-top:10px; display:flex; gap:20px;">
+                    <span id="player-display">Playing as: Player</span>
+                    <span id="level-length-display">Length: 0s</span>
+                    <span id="verify-attempts-display">Verify Attempts: 0</span>
+                </div>
+            </div>
+
+            <!-- EDITOR TAB -->
+            <div id="panel-editor" class="panel">
+                <div class="sub-tabs">
+                    <button class="sub-tab-btn active" onclick="switchEditorSubTab('blocks')">Blocks</button>
+                    <button class="sub-tab-btn" onclick="switchEditorSubTab('hazards')">Hazards</button>
+                    <button class="sub-tab-btn" onclick="switchEditorSubTab('triggers')">Triggers</button>
+                </div>
+                <div id="tools-blocks" class="tool-group active">
+                    <button class="ui-btn tool-btn active" id="btn-block" onclick="selectTool('block')">Block [1]</button>
+                </div>
+                <div id="tools-hazards" class="tool-group">
+                    <button class="ui-btn tool-btn" id="btn-spike" onclick="selectTool('spike')">Spike [2]</button>
+                    <button class="ui-btn tool-btn" id="btn-groundspike" onclick="selectTool('groundspike')" style="border-color:#555; color:#fff;">G.Spike [5]</button>
+                </div>
+                <div id="tools-triggers" class="tool-group">
+                    <button class="ui-btn tool-btn" id="btn-end" onclick="selectTool('end')">End [3]</button>
+                    <button class="ui-btn tool-btn" id="btn-startpos" onclick="selectTool('startpos')" style="border-color:#ffaa00; color:#ffaa00;">StartPos [4]</button>
+                </div>
+                <div style="width:100%; height:1px; background:#333; margin:10px 0;"></div>
+                <div class="controls-grid">
+                    <button class="ui-btn" onclick="rotateTool()">Rotate: <span id="rot-disp" style="color:var(--accent)">0°</span> <span class="shortcut-hint">[R]</span></button>
+                    <button class="ui-btn" onclick="undoLastAction()">Undo <span class="shortcut-hint">[Z]</span></button>
+                    <button class="ui-btn tool-btn" id="btn-delete" onclick="selectTool('delete')">Delete [X]</button>
+                    <button class="ui-btn danger" onclick="clearLevel()">Clear All</button>
+                    <span style="border-left:1px solid #444; height:20px; margin:0 5px;"></span>
+                    <button class="ui-btn" onclick="toggleAudioTest()">Test Audio</button>
+                    <select id="music-lib-select" onchange="loadLibrarySong()" style="background:#333; color:white; border:1px solid #555; padding:5px;">
+                        <option value="">-- Select Song --</option>
+                        <option value="https://raw.githubusercontent.com/Robloxfortniterroblox/azdazdazdazdazd/main/Clubstep_piano.mp3">Clubstep Piano</option>
+                        <option value="https://raw.githubusercontent.com/Robloxfortniterroblox/azdazdazdazdazd/main/StereoMadness.mp3">Stereo Madness</option>
+                    </select>
+                    <button class="ui-btn" onclick="document.getElementById('editor-audio-upload').click()">Import Audio</button>
+                    <input type="file" id="editor-audio-upload" accept=".mp3" onchange="handleFileUpload(this)" style="display:none;">
+                </div>
+            </div>
+
+            <!-- UPLOAD TAB -->
+            <div id="panel-upload" class="panel">
+                <div class="controls-grid">
+                    <button class="ui-btn" onclick="modalImportLevel()">Import Code</button>
+                    <button class="ui-btn" onclick="modalExportLevel()">Export Code</button>
+                </div>
+                <p style="font-size:11px; color:#666; margin-top:10px;">Share your level code with others. One-time export (not saved to server).</p>
+            </div>
+
+            <!-- LEVELS TAB -->
+            <div id="panel-levels" class="panel">
+                <div class="controls-grid" style="margin-bottom:10px;">
+                    <button id="btn-show-official" class="ui-btn filter-active" onclick="showLevels('official')">Official Levels</button>
+                    <button id="btn-show-imported" class="ui-btn" onclick="showLevels('imported')">Imported Levels</button>
+                </div>
+                <div id="level-display-area"></div>
+            </div>
+
+            <!-- ICON KIT TAB -->
+            <div id="panel-icon" class="panel">
+                <div id="icon-editor-container">
+                    <div><canvas id="editor-canvas" width="200" height="200"></canvas></div>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        <div class="palette">
+                            <div class="color-swatch active" style="background:#00baff" onclick="setPaintColor('#00baff', this)"></div>
+                            <div class="color-swatch" style="background:#33ff00" onclick="setPaintColor('#33ff00', this)"></div>
+                            <div class="color-swatch" style="background:#ff0000" onclick="setPaintColor('#ff0000', this)"></div>
+                            <div class="color-swatch" style="background:#111111" onclick="setPaintColor('#111111', this)"></div>
+                            <div class="color-swatch" style="background:#ffffff" onclick="setPaintColor('#ffffff', this)"></div>
+                            <div class="color-swatch" style="background:url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCI+PHJlY3Qgd2lkdGg9IjUiIGhlaWdodD0iNSIgZmlsbD0iI2NjYyIvPjxyZWN0IHg9IjUiIHk9IjUiIHdpZHRoPSI1IiBoZWlnaHQ9IjUiIGZpbGw9IiNjY2MiLz48L3N2Zz4=')" onclick="setPaintColor(null, this)" title="Eraser"></div>
+                        </div>
+                        <button class="ui-btn" onclick="applyIcon()">Save & Apply</button>
+                        <div style="height:1px; background:#444; margin:5px 0;"></div>
+                        <button class="ui-btn" onclick="loadPreset('default')">Load Default</button>
+                        <button class="ui-btn" onclick="loadPreset('evil')">Load Evil</button>
+                        <div style="height:1px; background:#444; margin:5px 0;"></div>
+                        <button class="ui-btn" onclick="modalImportIcon()">Import Icon</button>
+                        <button class="ui-btn" onclick="modalExportIcon()">Export Icon</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SETTINGS TAB -->
+            <div id="panel-settings" class="panel">
+                <div class="controls-grid">
+                    <label class="ui-btn" style="display:flex; align-items:center; gap:5px;">
+                        <input type="checkbox" id="chk-debug" onchange="toggleDebug()"> Show Hitboxes [H]
+                    </label>
+                </div>
+                <div style="margin-top:15px;">
+                    <h4 style="margin:0 0 5px 0; font-size:12px; color:#aaa;">MANUAL SONG UPLOAD (MAX 25MB)</h4>
+                    <input type="file" id="audio-upload" accept=".mp3" onchange="handleFileUpload(this)" style="font-size:12px; background:#333; color:white; border:1px solid #555;">
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // --- GLOBAL CONFIG ---
+    const SECRET_KEY = "THE_DISH_SECURE_HASH"; 
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const TILE_SIZE = 40; 
+    const FLOOR_Y = 10;   
+    const GRAVITY = 0.7;
+    const JUMP_FORCE = -11.5;
+    const SPEED = 6.0;
+    const FPS_CAP = 60;
+
+    // --- ICONS ---
+    const DEFAULT_ICON_JSON = "WyIjMDBiYWZmIiwiIzAwYmFmZiIsIiMwMGJhZmYiLCIjMDBiYWZmIiwiIzAwYmFmZiIsIiMwMGJhZmYiLCIjMDBiYWZmIiwiIzAwYmFmZiIsIiMwMGJhZmYiLCIjMDBiYWZmIiwiIzAwYmFmZiIsIiMwMGJhZmYiLCIjMzNmZjAwIiwiIzMzZmYwMCIsIiMwMGJhZmYiLCIjMDBiYWZmIiwiIzAwYmFmZiIsIiMzM2ZmMDAiLCIjMzNmZjAwIiwiIzAwYmFmZiIsIiMwMGJhZmYiLCIjMDBiYWZmIiwiIzMzZmYwMCIsIiMzM2ZmMDAiLCIjMDBiYWZmIiwiIzAwYmFmZiIsIiMwMGJhZmYiLCIjMzNmZjAwIiwiIzMzZmYwMCIsIiMwMGJhZmYiLCIjMDBiYWZmIiwiIzAwYmFmZiIsIiMzM2ZmMDAiLCIjMzNmZjAwIiwiIzAwYmFmZiIsIiMwMGJhZmYiLCIjMDBiYWZmIiwiIzMzZmYwMCIsIiMzM2ZmMDAiLCIjMDBiYWZmIiwiIzAwYmFmZiIsIiMwMGJhZmYiLCIjMDBiYWZmIiwiIzAwYmFmZiIsIiMwMGJhZmYiLCIjMDBiYWZmIiwiIzAwYmFmZiIsIiMwMGJhZmYiLCIjMDBiYWZmIiwiIzAwYmFmZiIsIiMwMGJhZmYiLCIjMDBiYWZmIiwiIzAwYmFmZiIsIiMwMGJhZmYiLCIjMDBiYWZmIiwiIzAwYmFmZiIsIiMwMGJhZmYiLCIjMDBiYWZmIiwiIzAwYmFmZiIsIiMwMGJhZmYiLCIjMzNmZjAwIiwiIzAwYmFmZiIsIiMwMGJhZmYiLCIjMDBiYWZmIiwiIzAwYmFmZiIsIiMwMGJhZmYiLCIjMDBiYWZmIiwiIzMzZmYwMCIsIiMwMGJhZmYiLCIjMDBiYWZmIiwiIzMzZmYwMCIsIiMzM2ZmMDAiLCIjMzNmZjAwIiwiIzMzZmYwMCIsIiMzM2ZmMDAiLCIjMzNmZjAwIiwiIzMzZmYwMCIsIiMwMGJhZmYiLCIjMDBiYWZmIiwiIzAwYmFmZiIsIiMwMGJhZmYiLCIjMDBiYWZmIiwiIzAwYmFmZiIsIiMwMGJhZmYiLCIjMDBiYWZmIiwiIzAwYmFmZiIsIiMwMGJhZmYiLCIjMDBiYWZmIl0=";
+    const EVIL_ICON_JSON = "WyIjMTExMTExIiwiIzExMTExMSIsIiMxMTExMTEiLCIjMTExMTExIiwiIzExMTExMSIsIiMxMTExMTEiLCIjMTExMTExIiwiIzExMTExMSIsIiMxMTExMTEiLCIjMTExMTExIiwiIzExMTExMSIsIiMxMTExMTEiLCIjZmYwMDAwIiwiIzExMTExMSIsIiMxMTExMTEiLCIjMTExMTExIiwiIzExMTExMSIsIiMxMTExMTEiLCIjZmYwMDAwIiwiIzExMTExMSIsIiMxMTExMTEiLCIjMTExMTExIiwiI2ZmMDAwMCIsIiNmZjAwMDAiLCIjMTExMTExIiwiIzExMTExMSIsIiMxMTExMTEiLCIjZmYwMDAwIiwiI2ZmMDAwMCIsIiMxMTExMTEiLCIjMTExMTExIiwiIzExMTExMSIsIiNmZjAwMDAiLCIjZmYwMDAwIiwiIzExMTExMSIsIiMxMTExMTEiLCIjMTExMTExIiwiI2ZmMDAwMCIsIiNmZjAwMDAiLCIjMTExMTExIiwiIzExMTExMSIsIiMxMTExMTEiLCIjMTExMTExIiwiIzExMTExMSIsIiMxMTExMTEiLCIjMTExMTExIiwiIzExMTExMSIsIiMxMTExMTEiLCIjMTExMTExIiwiIzExMTExMSIsIiMxMTExMTEiLCIjMTExMTExIiwiIzExMTExMSIsIiMxMTExMTEiLCIjMTExMTExIiwiIzExMTExMSIsIiMxMTExMTEiLCIjMTExMTExIiwiIzExMTExMSIsIiMxMTExMTEiLCIjMTExMTExIiwiIzExMTExMSIsIiMxMTExMTEiLCIjMTExMTExIiwiIzExMTExMSIsIiMxMTExMTEiLCIjMTExMTExIiwiIzExMTExMSIsIiMxMTExMTEiLCIjMTExMTExIiwiIzExMTExMSIsIiMxMTExMTEiLCIjZmYwMDAwIiwiIzExMTExMSIsIiMxMTExMTEiLCIjMTExMTExIiwiIzExMTExMSIsIiMxMTExMTEiLCIjZmYwMDAwIiwiIzExMTExMSIsIiMxMTExMTEiLCIjMTExMTExIiwiIzExMTExMSIsIiNmZjAwMDAiLCIjZmYwMDAwIiwiI2ZmMDAwMCIsIiNmZjAwMDAiLCIjZmYwMDAwIiwiI2ZmMDAwMCIsIiMxMTExMTEiLCIjMTExMTExIiwiIzExMTExMSIsIiMxMTExMTEiLCIjMTExMTExIiwiIzExMTExMSIsIiMxMTExMTEiLCIjMTExMTExIiwiIzExMTExMSIsIiMxMTExMTEiLCIjMTExMTExIl0=";
+
+    const ICON_SIZE = 10;
+    let iconGrid = new Array(100).fill(null);
+    let paintColor = '#00baff';
+    const playerSprite = document.createElement('canvas');
+    playerSprite.width = 40; playerSprite.height = 40;
+
+    // --- GAME STATE ---
+    const CHALLENGE_LEVEL_MAP = [{x:9,y:9,type:"block",r:0},{x:12,y:9,type:"block",r:0},{x:13,y:9,type:"spike",r:0},{x:14,y:9,type:"spike",r:0},{x:16,y:7,type:"block",r:0},{x:16,y:8,type:"spike",r:2},{x:18,y:9,type:"block",r:0},{x:18,y:8,type:"spike",r:0},{x:19,y:8,type:"block",r:0},{x:19,y:9,type:"block",r:0},{x:20,y:8,type:"block",r:0},{x:21,y:8,type:"block",r:0},{x:22,y:8,type:"block",r:0},{x:23,y:8,type:"block",r:0},{x:22,y:7,type:"block",r:0},{x:25,y:7,type:"block",r:0},{x:25,y:8,type:"block",r:0},{x:24,y:8,type:"block",r:0},{x:25,y:9,type:"block",r:0},{x:26,y:7,type:"spike",r:0},{x:27,y:7,type:"spike",r:0},{x:29,y:7,type:"spike",r:0},{x:28,y:7,type:"spike",r:0},{x:26,y:8,type:"block",r:0},{x:27,y:8,type:"block",r:0},{x:28,y:8,type:"block",r:0},{x:29,y:8,type:"block",r:0},{x:29,y:9,type:"block",r:0},{x:16,y:6,type:"block",r:0},{x:16,y:5,type:"block",r:0},{x:16,y:4,type:"block",r:0},{x:31,y:7,type:"spike",r:2},{x:31,y:6,type:"block",r:2},{x:10,y:6,type:"block",r:2},{x:33,y:9,type:"spike",r:0},{x:34,y:9,type:"spike",r:0},{x:35,y:9,type:"spike",r:0},{x:36,y:9,type:"spike",r:0},{x:22,y:9,type:"block",r:0},{x:11,y:6,type:"spike",r:1},{x:42,y:7,type:"end",r:0}];
+    const CHALLENGE_SONG_URL = "https://raw.githubusercontent.com/Robloxfortniterroblox/azdazdazdazdazd/main/Clubstep_piano.mp3";
+
+    let mode = 'START'; 
+    let paused = false;
+    let cameraX = 0;
+    let showHitboxes = false;
+    let mouseHeld = false; 
+    let isTestMode = false;
+    let currentAttempts = 1;
+
+    let levelData = { map: [], verified: false, author: "Player", verifier: "Player", songUrl: "", hash: "", verifyAttempts: 0 };
+    
+    let officialLevels = [
+        { name: "Challenge", map: CHALLENGE_LEVEL_MAP, author: "Teigu", verifier: "Teigu", songUrl: CHALLENGE_SONG_URL, completed: false, hash: generateHash(CHALLENGE_LEVEL_MAP) }
+    ];
+    let importedLevels = [];
+    let currentLevelList = 'official';
+
+    // Editor
+    let editorScrollX = 0;
+    let selectedTool = 'block';
+    let currentRotation = 0; 
+    let undoStack = [];
+    let isEditorPainting = false;
+    let lastGridCoords = {x:-1, y:-1};
+    let isExternalLevel = false;
+    let hasWarnedEdit = false;
+
+    // Audio
+    let audioTrack = new Audio();
+    audioTrack.volume = 0.5;
+    let isTestingAudio = false; 
+    let audioBarX = 0;
+
+    // FPS
+    let fps = 0, frames = 0, lastTime = performance.now();
+
+    // Entities
+    let particles = [];
+    let respawnTimer = 0;
+    const RESPAWN_DELAY = 40; 
+    const player = { x: 0, y: 0, width: 30, height: 30, vy: 0, grounded: false, angle: 0, dead: false, won: false };
+
+    // --- INIT ---
+    window.onload = function() {
+        loadPreset('default'); 
+        showLevels('official');
+        renderIconEditor();
+        loop(); 
+    };
+
+    function startGame() {
+        document.getElementById('start-screen').style.display = 'none';
+        document.getElementById('app-container').style.display = 'flex';
+        loadSavedLevel(0, 'official'); 
+    }
+
+    // Helper for formatting text with Teigu check
+    function formatText(text) {
+        if(text === "Teigu") return "Teigu <span class='verified-badge'>✔</span>";
+        return text;
+    }
+
+    function generateHash(mapObj) {
+        const str = JSON.stringify(mapObj) + SECRET_KEY;
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; 
+        }
+        return hash.toString();
+    }
+
+    // --- MODAL SYSTEM ---
+    const modal = document.getElementById('custom-modal');
+    const modalTitle = document.getElementById('modal-title');
+    const modalDesc = document.getElementById('modal-desc');
+    const modalInput = document.getElementById('modal-input');
+    const modalBtn = document.getElementById('modal-confirm-btn');
+    let modalCallback = null;
+
+    function openModal(title, desc, value, callback) {
+        modalTitle.innerText = title;
+        modalDesc.innerText = desc;
+        modalInput.value = value;
+        modalCallback = callback;
+        modal.style.display = 'flex';
+        
+        if(value === null) { modalInput.style.display = 'none'; } 
+        else { modalInput.style.display = 'block'; }
+        
+        document.getElementById('modal-copy-btn').style.display = 'none'; 
+        paused = true;
+    }
+
+    function closeModal() {
+        modal.style.display = 'none';
+        modalCallback = null;
+        paused = false;
+    }
+
+    function copyModalText() {
+        const text = document.getElementById('modal-input');
+        text.select();
+        document.execCommand('copy');
+        const btn = document.getElementById('modal-copy-btn');
+        const original = btn.innerText;
+        btn.innerText = "Copied!";
+        setTimeout(() => btn.innerText = original, 1500);
+    }
+
+    document.getElementById('modal-confirm-btn').onclick = function() {
+        if(modalCallback) modalCallback(modalInput.value);
+        closeModal();
+    };
+
+    function showNotification(msg) {
+        openModal("Notification", msg, null, null);
+        document.getElementById('modal-confirm-btn').innerText = "OK";
+    }
+
+    function modalImportLevel() {
+        document.getElementById('modal-confirm-btn').innerText = "Import";
+        openModal("Import Level", "Paste level code below:", "", (val) => { if(val) loadLevelFromCode(val); });
+    }
+
+    function modalExportLevel() {
+        if(levelData.map.length === 0) { showNotification("Cannot export empty level."); return; }
+        
+        document.getElementById('modal-confirm-btn').innerText = "Next";
+        
+        // Export Logic 
+        // 1. Ask Creator Name
+        openModal("Export", "Enter Creator Name:", levelData.author || "Player", (creatorName) => {
+            if(creatorName) levelData.author = creatorName;
+            
+            // 2. Ask Verifier (If verified)
+            if (levelData.verified) {
+                setTimeout(() => {
+                    openModal("Export", "Enter Verifier Name:", levelData.verifier || creatorName, (verifName) => {
+                        if(verifName) levelData.verifier = verifName;
+                        finishExport();
+                    });
+                }, 100);
+            } else {
+                levelData.verifier = "None";
+                finishExport();
+            }
+        });
+        
+        function finishExport() {
+            if(levelData.verified) levelData.hash = generateHash(levelData.map);
+            const c = btoa(JSON.stringify(levelData));
+            setTimeout(() => {
+                document.getElementById('modal-confirm-btn').innerText = "Done";
+                openModal("Export Code", "Copy this code:", c, () => {
+                    importedLevels.push({
+                        name: "Exported", 
+                        map: JSON.parse(JSON.stringify(levelData.map)), 
+                        author: levelData.author, 
+                        verifier: levelData.verifier, 
+                        songUrl: levelData.songUrl, 
+                        completed: levelData.verified, 
+                        hash: levelData.hash
+                    });
+                    showLevels('imported');
+                });
+                document.getElementById('modal-copy-btn').style.display = 'block';
+            }, 100);
+        }
+    }
+
+    function modalImportIcon() { document.getElementById('modal-confirm-btn').innerText = "Load"; openModal("Import Icon", "Paste icon code:", "", (val) => { try { iconGrid = JSON.parse(atob(val)); renderIconEditor(); applyIcon(); } catch(e) { showNotification("Invalid Icon Code"); } }); }
+    
+    function modalExportIcon() { 
+        const code = btoa(JSON.stringify(iconGrid)); 
+        document.getElementById('modal-confirm-btn').innerText = "Done"; 
+        openModal("Export Icon", "Copy your icon code:", code, null);
+        document.getElementById('modal-copy-btn').style.display = 'block';
+    }
+
+    // --- UI LOGIC ---
+    function switchTab(tabName) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        
+        const index = ['play', 'editor', 'upload', 'levels', 'icon', 'settings'].indexOf(tabName);
+        document.querySelectorAll('.tab-btn')[index].classList.add('active');
+        document.getElementById(`panel-${tabName}`).classList.add('active');
+
+        paused = false;
+        document.getElementById('pause-overlay').style.display = 'none';
+        document.getElementById('end-screen-overlay').style.display = 'none';
+
+        if(tabName === 'editor') setMode('EDIT');
+        else if(tabName === 'play') setMode('PLAY');
+        else if(['settings','levels','icon','upload'].includes(tabName)) { if(mode === 'PLAY') setMode('MENU'); }
+    }
+
+    function switchEditorSubTab(subTab) {
+        document.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tool-group').forEach(g => g.classList.remove('active'));
+        
+        const btnIndex = ['blocks', 'hazards', 'triggers'].indexOf(subTab);
+        if(btnIndex > -1) {
+            document.querySelectorAll('.sub-tab-btn')[btnIndex].classList.add('active');
+            document.getElementById(`tools-${subTab}`).classList.add('active');
+        }
+    }
+
+    function showLevels(type) {
+        currentLevelList = type;
+        const container = document.getElementById('level-display-area');
+        container.innerHTML = '';
+        const list = (type === 'official') ? officialLevels : importedLevels;
+
+        document.getElementById('btn-show-official').classList.toggle('filter-active', type === 'official');
+        document.getElementById('btn-show-imported').classList.toggle('filter-active', type === 'imported');
+
+        if(list.length === 0) { container.innerHTML = '<div style="padding:10px; color:#666; font-style:italic;">No levels found.</div>'; return; }
+
+        list.forEach((lvl, index) => {
+            const div = document.createElement('div');
+            // Green border for completed levels
+            const completedClass = lvl.completed ? 'completed' : '';
+            div.className = `level-card ${completedClass}`;
+            
+            if(levelData._index === index && levelData._listType === type) {
+                div.classList.add('selected');
+            }
+            
+            let authorClass = 'auth-user';
+            if(lvl.author === 'Teigu') authorClass = 'auth-teigu'; else if(type === 'official') authorClass = 'auth-official';
+            let verifierClass = 'auth-user';
+            if((lvl.verifier || lvl.author) === 'Teigu') verifierClass = 'auth-teigu'; else if(type === 'official') verifierClass = 'auth-official';
+
+            div.innerHTML = `<div><strong>${lvl.name}</strong>
+                                <span class="level-credits">Made by <span class="${authorClass}">${formatText(lvl.author)}</span> and Verified by <span class="${verifierClass}">${formatText(lvl.verifier || lvl.author)}</span></span>
+                             </div>
+                             <button class="ui-btn" onclick="loadSavedLevel(${index}, '${type}')">Load</button>`;
+            container.appendChild(div);
+        });
+    }
+
+    function loadSavedLevel(index, type) {
+        const list = (type === 'official') ? officialLevels : importedLevels;
+        const saved = list[index];
+        levelData.map = JSON.parse(JSON.stringify(saved.map));
+        levelData.author = saved.author;
+        levelData.verifier = saved.verifier || saved.author;
+        levelData.songUrl = saved.songUrl || "";
+        levelData.verifyAttempts = saved.verifyAttempts || 0;
+        
+        if(saved.hash && saved.hash === generateHash(levelData.map)) {
+            levelData.verified = true;
+        } else {
+            levelData.verified = false;
+        }
+
+        levelData._index = index;
+        levelData._listType = type;
+        currentAttempts = 1;
+
+        isExternalLevel = true;
+        hasWarnedEdit = false;
+
+        checkAudioStatus();
+        resetPlayer();
+        switchTab('play');
+        updateStatusUI();
+    }
+
+    function checkAudioStatus() {
+        const warn = document.getElementById('song-warning');
+        audioTrack.pause();
+        if (levelData.songUrl) {
+            audioTrack.src = levelData.songUrl;
+            warn.style.display = 'none';
+        } else {
+            if (!audioTrack.src || audioTrack.src === window.location.href) warn.style.display = 'block';
+            else warn.style.display = 'none';
+        }
+    }
+    
+    function loadLibrarySong() {
+        const sel = document.getElementById('music-lib-select');
+        const url = sel.value;
+        if(url) {
+            audioTrack.src = url;
+            levelData.songUrl = url;
+            document.getElementById('song-warning').style.display = 'none';
+        }
+    }
+
+    function handleFileUpload(input) {
+        const file = input.files[0]; if (!file) return;
+        if (file.size > 25 * 1024 * 1024) { showNotification("File exceeds 25MB limit."); input.value = ""; return; }
+        if (file.type !== "audio/mpeg" && !file.name.endsWith(".mp3")) { showNotification("Only MP3 allowed."); input.value = ""; return; }
+        const url = URL.createObjectURL(file); audioTrack.src = url; levelData.songUrl = ""; document.getElementById('song-warning').style.display = 'none'; showNotification("Audio Loaded!"); input.blur();
+    }
+
+    function toggleAudioTest() {
+        if(isTestingAudio) {
+            audioTrack.pause();
+            isTestingAudio = false;
+        } else {
+            if(!audioTrack.src || document.getElementById('song-warning').style.display === 'block') { showNotification("No audio loaded."); return; }
+            let timeInSeconds = editorScrollX / (SPEED * FPS_CAP);
+            if(Number.isFinite(audioTrack.duration) && timeInSeconds > audioTrack.duration) timeInSeconds = 0;
+            audioTrack.currentTime = timeInSeconds;
+            audioTrack.play();
+            isTestingAudio = true;
+        }
+    }
+
+    // --- GAME LOOP ---
+    function update() {
+        const now = performance.now();
+        if (now - lastTime >= 1000) { document.getElementById('fps-counter').innerText = "FPS: " + frames; frames = 0; lastTime = now; }
+        frames++;
+
+        if(paused || mode === 'START') return;
+
+        // HUD Updates
+        if(mode === 'PLAY') {
+            document.getElementById('attempt-counter').innerText = "Attempt " + currentAttempts;
+            const endObj = levelData.map.find(o => o.type === 'end');
+            if(endObj) {
+                const endX = endObj.x * TILE_SIZE;
+                let pct = 0;
+                if(endX > 0) pct = Math.floor((player.x / endX) * 100);
+                if(pct > 100) pct = 100; if(pct < 0) pct = 0;
+                document.getElementById('percentage-label').innerText = pct + "%";
+            }
+        }
+
+        if(player.dead) {
+            for(let i=particles.length-1; i>=0; i--) {
+                let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life -= 0.05;
+                if(p.life <= 0) particles.splice(i, 1);
+            }
+            respawnTimer++;
+            // Instant Respawn Logic
+            if(respawnTimer >= 20) resetPlayer(); 
+            return;
+        }
+
+        if(mode === 'PLAY') {
+            if(player.won) return;
+            player.x += SPEED; player.vy += GRAVITY; player.y += player.vy;
+            if (!player.grounded) player.angle += 0.15;
+            else player.angle = Math.round(player.angle / (Math.PI/2)) * (Math.PI/2);
+            player.grounded = false;
+            
+            if(player.y + player.height >= FLOOR_Y * TILE_SIZE) {
+                player.y = (FLOOR_Y * TILE_SIZE) - player.height; player.vy = 0; player.grounded = true;
+            }
+            checkCollisions();
+            if((keys['Space'] || keys['ArrowUp'] || mouseHeld) && player.grounded) {
+                player.vy = JUMP_FORCE; player.grounded = false;
+            }
+            cameraX = player.x - 200;
+        } 
+        else if (mode === 'EDIT') {
+            const speed = keys['ShiftLeft'] ? 20 : 10;
+            if(keys['KeyD'] || keys['ArrowRight']) editorScrollX += speed;
+            if(keys['KeyA'] || keys['ArrowLeft']) editorScrollX -= speed;
+            if(editorScrollX < 0) editorScrollX = 0;
+            cameraX = editorScrollX;
+            
+            if(isTestingAudio) {
+                if(audioTrack.paused) isTestingAudio = false; 
+                else audioBarX = audioTrack.currentTime * (SPEED * FPS_CAP);
+            } else {
+                if(audioTrack.currentTime > 0) audioBarX = audioTrack.currentTime * (SPEED * FPS_CAP);
+            }
+        }
+    }
+
+    function checkCollisions() {
+        const pOut = {x: player.x, y: player.y, w: player.width, h: player.height};
+        const pIn = {x: player.x+9, y: player.y+9, w:12, h:12};
+        const gridX = Math.floor(player.x / TILE_SIZE);
+        const nearby = levelData.map.filter(o => o.x >= gridX - 1 && o.x <= gridX + 3);
+        
+        let nextY = player.y + player.vy;
+
+        // 1. LANDING LOGIC
+        if(player.vy > 0) { 
+            for(let obj of nearby) {
+                if(obj.type === 'block') {
+                    const bx = obj.x*TILE_SIZE, by = obj.y*TILE_SIZE;
+                    if(player.x + player.width > bx + 2 && player.x < bx + TILE_SIZE - 2) {
+                        if(player.y + player.height <= by + Math.max(25, player.vy + 10) && nextY + player.height >= by) {
+                            player.y = by - player.height;
+                            player.vy = 0;
+                            player.grounded = true;
+                            pOut.y = player.y;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. DEATH LOGIC
+        const pOutFinal = {x: player.x, y: player.y, w: player.width, h: player.height};
+
+        for(let obj of nearby) {
+            if(obj.type === 'spike') { 
+                if(rectIntersect(pOutFinal, getRotatedHitbox(obj))) die(); 
+            }
+            else if(obj.type === 'groundspike') { 
+                if(rectIntersect(pOutFinal, getGroundSpikeHitbox(obj))) die(); 
+            }
+            else if (obj.type === 'block') { 
+                if(rectIntersect(pIn, {x:obj.x*TILE_SIZE, y:obj.y*TILE_SIZE, w:TILE_SIZE, h:TILE_SIZE})) die(); 
+            }
+            else if (obj.type === 'end') { 
+                if(rectIntersect(pOutFinal, {x:obj.x*TILE_SIZE, y:(obj.y-2)*TILE_SIZE, w:TILE_SIZE, h:TILE_SIZE*3})) winLevel(); 
+            }
+        }
+    }
+
+    function draw() {
+        ctx.fillStyle = '#121212'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        grad.addColorStop(0, '#005c97'); grad.addColorStop(1, '#363795');
+        ctx.fillStyle = grad; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.save();
+        ctx.translate(-cameraX, 0);
+
+        if(mode === 'EDIT') {
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1;
+            const startX = Math.floor(cameraX/TILE_SIZE)*TILE_SIZE;
+            for(let x=startX; x<startX+canvas.width+TILE_SIZE; x+=TILE_SIZE) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke(); }
+            for(let y=0; y<canvas.height; y+=TILE_SIZE) { ctx.beginPath(); ctx.moveTo(cameraX,y); ctx.lineTo(cameraX+canvas.width,y); ctx.stroke(); }
+        }
+
+        const fy = FLOOR_Y * TILE_SIZE;
+        ctx.fillStyle = '#000'; ctx.fillRect(cameraX, fy, canvas.width, canvas.height);
+        ctx.strokeStyle = '#00d2ff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cameraX, fy); ctx.lineTo(cameraX+canvas.width, fy); ctx.stroke();
+        ctx.strokeStyle = 'gold'; ctx.setLineDash([10,5]); ctx.beginPath(); ctx.moveTo(100, -500); ctx.lineTo(100, fy); ctx.stroke(); ctx.setLineDash([]);
+
+        for(let obj of levelData.map) {
+            const x = obj.x * TILE_SIZE; const y = obj.y * TILE_SIZE;
+            if(x < cameraX - TILE_SIZE || x > cameraX + canvas.width) continue;
+            ctx.save(); ctx.translate(x+20, y+20); ctx.rotate((obj.r||0)*(Math.PI/2)); ctx.translate(-(x+20), -(y+20));
+
+            if(obj.type === 'block') {
+                ctx.fillStyle = 'black'; ctx.fillRect(x,y,40,40);
+                ctx.strokeStyle = '#00ff00'; ctx.strokeRect(x,y,40,40);
+                ctx.globalAlpha = 0.3; ctx.fillStyle = '#00ff00'; ctx.fillRect(x+5,y+5,30,30);
+            } else if (obj.type === 'spike') {
+                ctx.fillStyle = 'red'; ctx.beginPath(); ctx.moveTo(x,y+40); ctx.lineTo(x+20,y); ctx.lineTo(x+40,y+40); ctx.fill(); ctx.strokeStyle='white'; ctx.stroke();
+            } else if (obj.type === 'groundspike') {
+                ctx.fillStyle = 'black'; ctx.beginPath(); ctx.moveTo(x,y+40); ctx.lineTo(x+10,y+20); ctx.lineTo(x+20,y+40); ctx.lineTo(x+30,y+10); ctx.lineTo(x+40,y+40); ctx.fill();
+            } else if (obj.type === 'end') {
+                ctx.fillStyle = 'rgba(0,255,170,0.5)'; ctx.fillRect(x,y-80,40,120); ctx.strokeStyle = '#00ffaa'; ctx.strokeRect(x,y-80,40,120);
+            } else if (obj.type === 'startpos') {
+                if(mode === 'EDIT') {
+                    ctx.fillStyle = 'rgba(255, 165, 0, 0.7)'; ctx.fillRect(x,y,40,40);
+                    ctx.strokeStyle = 'orange'; ctx.lineWidth=2; ctx.strokeRect(x,y,40,40);
+                    ctx.fillStyle = 'white'; ctx.font="bold 20px Arial"; ctx.fillText("S", x+13, y+28);
+                }
+            }
+            ctx.restore();
+            if(showHitboxes) {
+                if(obj.type==='spike') { const hb = getRotatedHitbox(obj); ctx.strokeStyle='#8b0000'; ctx.strokeRect(hb.x,hb.y,hb.w,hb.h); }
+                else if(obj.type==='groundspike') { const hb = getGroundSpikeHitbox(obj); ctx.strokeStyle='#8b0000'; ctx.strokeRect(hb.x,hb.y,hb.w,hb.h); }
+                else if (obj.type==='block') { ctx.strokeStyle='blue'; ctx.strokeRect(x,y,40,40); }
+            }
+        }
+
+        if(mode === 'EDIT' && (isTestingAudio || audioBarX > 0)) {
+            ctx.strokeStyle = '#00ff00'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(audioBarX, 0); ctx.lineTo(audioBarX, canvas.height); ctx.stroke();
+            if (isTestingAudio && audioBarX > cameraX + canvas.width - 100) { editorScrollX = audioBarX - 100; cameraX = editorScrollX; }
+        }
+
+        ctx.globalAlpha = 1.0;
+        for(let p of particles) { ctx.fillStyle = p.color; ctx.globalAlpha = p.life; ctx.fillRect(p.x, p.y, 8, 8); }
+
+        if(mode === 'PLAY' && !player.dead) {
+            ctx.globalAlpha = 1.0; ctx.save(); ctx.translate(player.x+15, player.y+15); ctx.rotate(player.angle);
+            ctx.drawImage(playerSprite, -15, -15, 30, 30); ctx.restore();
+            if(showHitboxes) { ctx.strokeStyle='red'; ctx.strokeRect(player.x, player.y, 30, 30); ctx.strokeStyle='blue'; ctx.strokeRect(player.x+9, player.y+9, 12, 12); }
+        }
+        ctx.restore();
+    }
+
+    // --- UTILS ---
+    function getRotatedHitbox(obj) {
+        const r = obj.r || 0; const x = obj.x*40; const y = obj.y*40;
+        if(r === 0) return {x: x+16, y: y+18, w: 8, h: 12}; if(r === 1) return {x: x+10, y: y+16, w: 12, h: 8};
+        if(r === 2) return {x: x+16, y: y+10, w: 8, h: 12}; if(r === 3) return {x: x+18, y: y+16, w: 12, h: 8};
+        return {x: x, y: y, w: 40, h: 40};
+    }
+    function getGroundSpikeHitbox(obj) {
+        const x = obj.x * 40; const y = obj.y * 40;
+        return { x: x+13, y: y+28, w: 14, h: 12 };
+    }
+    function rectIntersect(r1, r2) { return (r1.x < r2.x + r2.w && r1.x + r1.w > r2.x && r1.y < r2.y + r2.h && r1.y + r1.h > r2.y); }
+    function setMode(newMode) {
+        mode = newMode;
+        if(mode === 'PLAY') { resetPlayer(); paused = false; canvas.focus(); }
+        else { audioTrack.pause(); isTestingAudio = false; editorScrollX = cameraX; }
+    }
+    function resetPlayer() {
+        const startPos = levelData.map.find(o => o.type === 'startpos');
+        const testLabel = document.getElementById('testmode-label');
+        
+        if (startPos && mode === 'PLAY') {
+            player.x = startPos.x * TILE_SIZE; player.y = (startPos.y * TILE_SIZE) - player.height; isTestMode = true; testLabel.style.display = 'block';
+        } else {
+            player.x = 100; player.y = (FLOOR_Y * TILE_SIZE) - player.height; isTestMode = false; testLabel.style.display = 'none';
+        }
+
+        player.vy = 0; player.grounded = true; player.angle = 0; player.dead = false; player.won = false;
+        cameraX = player.x - 200; if(cameraX < 0) cameraX = 0; particles = []; respawnTimer = 0;
+        
+        document.getElementById('end-screen-overlay').style.display = 'none';
+
+        if(mode === 'PLAY' && audioTrack.src && !paused) { 
+            if(startPos) { const time = (startPos.x * TILE_SIZE) / (SPEED * FPS_CAP); if(Number.isFinite(audioTrack.duration) && time < audioTrack.duration) { audioTrack.currentTime = time; } else { audioTrack.currentTime = 0; } } else { audioTrack.currentTime = 0; }
+            audioTrack.play().catch(()=>{}); 
+        }
+    }
+    function die() {
+        if(player.dead) return; 
+        if(!isTestMode && !levelData.verified) levelData.verifyAttempts++; else currentAttempts++;
+        player.dead = true; audioTrack.pause();
+        for(let i=0; i<20; i++) particles.push({ x: player.x+15, y: player.y+15, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 1.0, color: Math.random()>0.5?'#00baff':'#33ff00' });
+        updateStatusUI();
+    }
+    function winLevel() { 
+        if(showHitboxes) { showNotification("Can't complete level using Hitboxes"); player.won = true; return; }
+        if(isTestMode) { showNotification("Can't complete level in Testmode"); player.won = true; return; }
+        
+        if(levelData.map.find(o=>o.type==='end') === undefined) {
+             showNotification("Level has no End Trigger!"); player.won=true; return;
+        }
+
+        const endOverlay = document.getElementById('end-screen-overlay');
+        const endTitle = document.getElementById('end-title-text');
+        const endSub = document.getElementById('end-sub-text');
+        
+        let subMsg = "Attempts: " + currentAttempts;
+
+        if(!levelData.verified) {
+            levelData.verified = true; 
+            levelData.verifier = USERNAME; 
+            levelData.hash = generateHash(levelData.map);
+            endTitle.innerText = "LEVEL VERIFIED!";
+        } else {
+            endTitle.innerText = "LEVEL COMPLETE!";
+        }
+        
+        endSub.innerText = subMsg;
+        currentAttempts = 1;
+
+        endOverlay.style.display = 'flex';
+        player.won = true; 
+        updateStatusUI();
+        
+        if(levelData._listType === 'imported' && levelData._index !== undefined) {
+            const list = importedLevels; if(list[levelData._index]) list[levelData._index].completed = true; 
+            showLevels('imported');
+        } else if (levelData._listType === 'official' && levelData._index !== undefined) {
+             const list = officialLevels; if(list[levelData._index]) list[levelData._index].completed = true; 
+             showLevels('official');
+        }
+    }
+    function updateStatusUI() {
+        const badge = document.getElementById('status-badge');
+        
+        const endX = levelData.map.find(o => o.type === 'end')?.x * TILE_SIZE || 0;
+        const seconds = Math.ceil(endX / (SPEED * 60));
+        
+        document.getElementById('level-length-display').innerText = "Length: " + seconds + "s";
+        document.getElementById('verify-attempts-display').innerText = "Verify Attempts: " + (levelData.verifyAttempts || 0);
+        document.getElementById('player-display').innerHTML = "Playing as: " + formatText(USERNAME);
+        
+        if(levelData.verified) { badge.innerHTML = "VERIFIED BY <span class='auth-user'>" + formatText(levelData.verifier || levelData.author) + "</span>"; badge.className = "st-green"; }
+        else { badge.innerText = "UNVERIFIED"; badge.className = "st-red"; }
+    }
+    function loadLevelFromCode(code) {
+        try { 
+            const data = JSON.parse(atob(code)); 
+            if(data.map) { 
+                importedLevels.push({ name: "Imported " + (importedLevels.length+1), map: data.map, author: data.author || "Unknown", verifier: data.verifier || "Unknown", songUrl: data.songUrl, hash: data.hash, completed: false });
+                showLevels('imported'); loadSavedLevel(importedLevels.length - 1, 'imported');
+            } 
+        } catch(e) { showNotification("Invalid Code"); }
+    }
+    function undoLastAction() {
+        if (undoStack.length === 0) return; const last = undoStack.pop();
+        if (last.action === 'create') { const idx = levelData.map.indexOf(last.item); if (idx !== -1) levelData.map.splice(idx, 1); } 
+        else if (last.action === 'delete') { levelData.map.push(last.item); }
+        modifyLevel();
+    }
+    function clearLevel() { if(confirm("Clear Map? This will reset verification.")) { 
+        levelData.map = []; levelData.verified = false; levelData.author = "Player"; levelData.hash = ""; updateStatusUI(); undoStack = []; isExternalLevel = false;
+    } }
+    function selectTool(t) { 
+        if(t === 'delete' && selectedTool === 'delete') {
+            selectedTool = 'block';
+            document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));
+            document.getElementById('btn-block').classList.add('active');
+            return;
+        }
+        selectedTool=t; 
+        document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active')); 
+        document.getElementById(`btn-${t}`).classList.add('active'); 
+    }
+    function rotateTool() { currentRotation=(currentRotation+1)%4; document.getElementById('rot-disp').innerText=(currentRotation*90)+"°"; }
+    function handleFileUpload(input) {
+        const file = input.files[0]; if (!file) return;
+        if (file.size > 25 * 1024 * 1024) { showNotification("File exceeds 25MB limit."); input.value = ""; return; }
+        if (file.type !== "audio/mpeg" && !file.name.endsWith(".mp3")) { showNotification("Only MP3 allowed."); input.value = ""; return; }
+        const url = URL.createObjectURL(file); audioTrack.src = url; levelData.songUrl = ""; document.getElementById('song-warning').style.display = 'none'; showNotification("Audio Loaded!"); input.blur();
+    }
+    function togglePause() { if(mode!=='PLAY')return; paused=!paused; document.getElementById('pause-overlay').style.display=paused?'flex':'none'; if(paused)audioTrack.pause(); else if(!player.dead)audioTrack.play(); }
+    function toggleDebug() { showHitboxes = document.getElementById('chk-debug').checked; }
+
+    // --- ICON EDITOR ---
+    const editCanvas = document.getElementById('editor-canvas'); const editCtx = editCanvas.getContext('2d');
+    function loadPreset(type) { 
+        let json;
+        if(type === 'default') json = DEFAULT_ICON_JSON;
+        else if(type === 'evil') json = EVIL_ICON_JSON;
+        
+        try { iconGrid = JSON.parse(atob(json)); } catch(e) { iconGrid = new Array(100).fill(null); }
+        renderIconEditor(); applyIcon(); 
+    }
+    function setPaintColor(col, el) { paintColor = col; document.querySelectorAll('.color-swatch').forEach(d => d.classList.remove('active')); el.classList.add('active'); }
+    function renderIconEditor() { editCtx.clearRect(0,0,200,200); const cellSize = 20; for(let i=0; i<100; i++) { const x = (i % 10) * cellSize; const y = Math.floor(i / 10) * cellSize; if(iconGrid[i]) { editCtx.fillStyle = iconGrid[i]; editCtx.fillRect(x,y,cellSize,cellSize); } editCtx.strokeStyle = 'rgba(255,255,255,0.1)'; editCtx.strokeRect(x,y,cellSize,cellSize); } }
+    let isDrawingIcon = false; editCanvas.addEventListener('mousedown', e => { isDrawingIcon = true; handleIconDraw(e); }); window.addEventListener('mouseup', () => isDrawingIcon = false); editCanvas.addEventListener('mousemove', e => { if(isDrawingIcon) handleIconDraw(e); });
+    function handleIconDraw(e) { const rect = editCanvas.getBoundingClientRect(); const x = Math.floor((e.clientX - rect.left) / 20); const y = Math.floor((e.clientY - rect.top) / 20); if(x<0||x>9||y<0||y>9) return; const idx = y * 10 + x; if(iconGrid[idx] !== paintColor) { iconGrid[idx] = paintColor; renderIconEditor(); } }
+    function applyIcon() { const pCtx = playerSprite.getContext('2d'); pCtx.clearRect(0,0,40,40); const pixelSize = 4; for(let i=0; i<100; i++) { if(iconGrid[i]) { pCtx.fillStyle = iconGrid[i]; pCtx.fillRect((i%10)*pixelSize, Math.floor(i/10)*pixelSize, pixelSize, pixelSize); } } pCtx.strokeStyle = 'rgba(0,0,0,0.5)'; pCtx.lineWidth = 2; pCtx.strokeRect(0,0,40,40); }
+    function modalImportIcon() { document.getElementById('modal-input').style.display = "block"; document.getElementById('modal-confirm-btn').innerText = "Load"; openModal("Import Icon", "Paste icon code:", "", (val) => { try { iconGrid = JSON.parse(atob(val)); renderIconEditor(); applyIcon(); } catch(e) { showNotification("Invalid Icon Code"); } }); }
+    function modalExportIcon() { const code = btoa(JSON.stringify(iconGrid)); document.getElementById('modal-input').style.display = "block"; document.getElementById('modal-confirm-btn').innerText = "Done"; openModal("Export Icon", "Copy your icon code:", code, null); document.getElementById('modal-copy-btn').style.display = 'block'; }
+
+    // --- EDITOR INPUT ---
+    function modifyLevel() { 
+        if(isExternalLevel && !hasWarnedEdit) {
+            openModal("Warning", "Editing an imported/official level resets verification. Continue?", null, (val) => {
+                hasWarnedEdit = true;
+                levelData.verified = false; levelData.hash = ""; updateStatusUI(); 
+            });
+            return false;
+        }
+        levelData.verified = false; levelData.hash = ""; updateStatusUI(); 
+        return true;
+    }
+    const keys = {};
+    window.addEventListener('keydown', e => { if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.code) > -1) e.preventDefault(); keys[e.code] = true; 
+        if(mode === 'START') return;
+
+        if (e.code === 'Escape') togglePause(); if(e.code === 'KeyH') { document.getElementById('chk-debug').checked = !document.getElementById('chk-debug').checked; toggleDebug(); } if(e.code === 'KeyR' && mode === 'PLAY') resetPlayer(); if (paused) return; if (e.code === 'Enter') switchTab('play'); if (e.code === 'KeyE') switchTab('editor'); 
+        if (mode === 'EDIT') { 
+            if (e.key==='1') selectTool('block'); if (e.key==='2') selectTool('spike'); if (e.key==='3') selectTool('end'); if (e.key==='4') selectTool('startpos'); if(e.key==='5') selectTool('groundspike'); 
+            if (e.key==='x') selectTool('delete'); 
+            if (e.code==='KeyR') rotateTool(); if (e.code==='KeyZ') undoLastAction(); 
+        } 
+    });
+    window.addEventListener('keyup', e => keys[e.code] = false);
+    
+    window.addEventListener('mousedown', e => {
+        if(e.target !== canvas) return; mouseHeld = true;
+        if(mode === 'EDIT' && !paused) { isEditorPainting = true; handleEditorAction(e); }
+    });
+    window.addEventListener('mousemove', e => {
+        if(mode === 'EDIT' && isEditorPainting && !paused) handleEditorAction(e);
+    });
+    window.addEventListener('mouseup', () => { mouseHeld = false; isEditorPainting = false; lastGridCoords = {x:-1, y:-1}; });
+
+    function handleEditorAction(e) {
+        const r=canvas.getBoundingClientRect(); const mx=e.clientX-r.left+editorScrollX; const my=e.clientY-r.top;
+        const gx=Math.floor(mx/40); const gy=Math.floor(my/40); if(gy>=FLOOR_Y) return;
+        
+        if(gx === lastGridCoords.x && gy === lastGridCoords.y) return;
+        lastGridCoords = {x:gx, y:gy};
+
+        if(!modifyLevel()) return;
+
+        const existingIndex = levelData.map.findIndex(b => b.x === gx && b.y === gy);
+        if (existingIndex !== -1) {
+            const item = levelData.map[existingIndex];
+            
+            if(selectedTool === 'delete') {
+                levelData.map.splice(existingIndex, 1);
+                undoStack.push({action:'delete',item:item});
+                return;
+            }
+
+            if(item.type === selectedTool) return;
+            
+            levelData.map.splice(existingIndex, 1); 
+            undoStack.push({action:'delete',item:item});
+        }
+        
+        if(selectedTool === 'delete') return;
+
+        if (selectedTool === 'startpos') { const other = levelData.map.findIndex(o => o.type === 'startpos'); if (other !== -1) levelData.map.splice(other, 1); }
+        if (selectedTool === 'end') { const other = levelData.map.findIndex(o => o.type === 'end'); if (other !== -1) levelData.map.splice(other, 1); }
+        
+        const it={x:gx,y:gy,type:selectedTool,r:currentRotation}; levelData.map.push(it); undoStack.push({action:'create',item:it});
+    }
+
+    function loop() { update(); draw(); requestAnimationFrame(loop); }
+</script>
+</body>
+</html>
