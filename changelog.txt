@@ -1,6 +1,5 @@
 Geodash 1.0.5 -- The everything update
 
-
 -------
 Quick summary:
 -------
@@ -32,6 +31,7 @@ Detailed additions:
 - Added Noclip and Noclip deaths
 - Added 2 new songs
 - Added Emergency save (saves upon leaving/crash)
+- Added changelog button
   
 Bugfixes:
 - Fixed verify attempts not counting
