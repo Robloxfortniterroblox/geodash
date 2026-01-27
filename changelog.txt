@@ -1,0 +1,45 @@
+Geodash 1.0.5 -- The everything update
+
+
+-------
+Quick summary:
+-------
+Main additions:
+
+- 3 New blocks
+- Smart startpos
+- Emergency save
+- New main level
+- Added Noclip
+- Added something to the icon kit...
+
+Main Bugfixes:
+- Gravity launching (added jump pad to bring it back cuz it was cool)
+- Removed Herobrine
+
+-------
+Detailed changelog:
+-------
+
+Detailed additions:
+- Added Yellow Pad
+- Added Half Block
+- Added Wide Spike
+- Added Smart startpos
+- Added NEW LEVEL button
+- Added new main level
+- Added something to the icon kit...
+- Added Noclip and Noclip deaths
+- Added 2 new songs
+- Added Emergency save (saves upon leaving/crash)
+  
+Bugfixes:
+- Fixed verify attempts not counting
+- Gravity launching
+- Double clicking orbs
+- Prob many more that I forgot about
+
+Tweaks:
+- Refined Custom keybinds (shift+click a tool)
+- prob more, I'll keep track of this stuff better in the future
+
