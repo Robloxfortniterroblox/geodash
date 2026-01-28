@@ -1,4 +1,4 @@
-Geodash 1.0.5 -- The everything update
+Geodash 1.0.5 -- The Everything Update
 
 -------
 Quick summary:
@@ -6,11 +6,13 @@ Quick summary:
 Main additions:
 
 - 3 New blocks
+- Added the coin
+- Color trigger
 - Smart startpos
 - Emergency save
 - New main level
 - Added Noclip
-- Added something to the icon kit...
+- Added new icons and... something
 
 Main Bugfixes:
 - Gravity launching (added jump pad to bring it back cuz it was cool)
@@ -32,6 +34,9 @@ Detailed additions:
 - Added 2 new songs
 - Added Emergency save (saves upon leaving/crash)
 - Added changelog button
+- Added color trigger
+- Added the coin
+- Added preview mode
   
 Bugfixes:
 - Fixed verify attempts not counting
@@ -42,4 +47,5 @@ Bugfixes:
 Tweaks:
 - Refined Custom keybinds (shift+click a tool)
 - prob more, I'll keep track of this stuff better in the future
+- Changed 
 
